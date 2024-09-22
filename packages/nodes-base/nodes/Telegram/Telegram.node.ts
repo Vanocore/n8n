@@ -234,6 +234,12 @@ export class Telegram implements INodeType {
 						action: 'Send an audio file',
 					},
 					{
+						name: 'Send Voice',
+						value: 'sendVoice',
+						description: 'Send a voice recording file',
+						action: 'Send a voice file',
+					},
+					{
 						name: 'Send Chat Action',
 						value: 'sendChatAction',
 						description: 'Send a chat action',
@@ -313,6 +319,7 @@ export class Telegram implements INodeType {
 							'setTitle',
 							'sendAnimation',
 							'sendAudio',
+							'sendVoice',
 							'sendChatAction',
 							'sendDocument',
 							'sendLocation',
@@ -686,7 +693,7 @@ export class Telegram implements INodeType {
 					'Unique identifier for the target chat or username of the target channel (in the format @channelusername). To find your chat ID ask @get_id_bot.',
 			},
 			// ----------------------------------
-			//         message:sendAnimation/sendAudio/sendDocument/sendPhoto/sendSticker/sendVideo
+			//         message:sendAnimation/sendAudio/sendVoice/sendDocument/sendPhoto/sendSticker/sendVideo
 			// ----------------------------------
 
 			{
@@ -700,6 +707,7 @@ export class Telegram implements INodeType {
 						operation: [
 							'sendAnimation',
 							'sendAudio',
+							'sendVoice',
 							'sendDocument',
 							'sendPhoto',
 							'sendVideo',
@@ -722,6 +730,7 @@ export class Telegram implements INodeType {
 						operation: [
 							'sendAnimation',
 							'sendAudio',
+							'sendVoice',
 							'sendDocument',
 							'sendPhoto',
 							'sendVideo',
@@ -824,6 +833,25 @@ export class Telegram implements INodeType {
 				},
 				description:
 					'Audio file to send. Pass a file_id to send a file that exists on the Telegram servers (recommended), an HTTP URL for Telegram to get a file from the Internet.',
+			},
+
+			// ----------------------------------
+			//         message:sendVoice
+			// ----------------------------------
+			{
+				displayName: 'Voice',
+				name: 'file',
+				type: 'string',
+				default: '',
+				displayOptions: {
+					show: {
+						operation: ['sendVoice'],
+						resource: ['message'],
+						binaryData: [false],
+					},
+				},
+				description:
+					'Voice file to send. Pass a file_id to send a file that exists on the Telegram servers (recommended), an HTTP URL for Telegram to get a file from the Internet.',
 			},
 
 			// ----------------------------------
@@ -1139,6 +1167,7 @@ export class Telegram implements INodeType {
 							'sendSticker',
 							'sendVideo',
 							'sendAudio',
+							'sendVoice',
 							'sendLocation',
 						],
 						resource: ['message'],
@@ -1495,6 +1524,7 @@ export class Telegram implements INodeType {
 							'editMessageText',
 							'sendAnimation',
 							'sendAudio',
+							'sendVoice',
 							'sendDocument',
 							'sendLocation',
 							'sendMessage',
@@ -1527,6 +1557,7 @@ export class Telegram implements INodeType {
 								'/operation': [
 									'sendAnimation',
 									'sendAudio',
+									'sendVoice',
 									'sendDocument',
 									'sendPhoto',
 									'sendVideo',
@@ -1570,7 +1601,7 @@ export class Telegram implements INodeType {
 						},
 						displayOptions: {
 							show: {
-								'/operation': ['sendAnimation', 'sendAudio', 'sendVideo'],
+								'/operation': ['sendAnimation', 'sendAudio', 'sendVoice', 'sendVideo'],
 							},
 						},
 						default: 0,
@@ -1586,6 +1617,7 @@ export class Telegram implements INodeType {
 								'/operation': [
 									'sendAnimation',
 									'sendAudio',
+									'sendVoice',
 									'sendDocument',
 									'sendPhoto',
 									'sendVideo',
@@ -1636,6 +1668,7 @@ export class Telegram implements INodeType {
 									'editMessageText',
 									'sendAnimation',
 									'sendAudio',
+									'sendVoice',
 									'sendMessage',
 									'sendPhoto',
 									'sendVideo',
@@ -1652,7 +1685,7 @@ export class Telegram implements INodeType {
 						type: 'string',
 						displayOptions: {
 							show: {
-								'/operation': ['sendAudio'],
+								'/operation': ['sendAudio', 'sendVoice'],
 							},
 						},
 						default: '',
@@ -1679,6 +1712,7 @@ export class Telegram implements INodeType {
 								'/operation': [
 									'sendAnimation',
 									'sendAudio',
+									'sendVoice',
 									'sendChatAction',
 									'sendDocument',
 									'sendLocation',
@@ -1699,7 +1733,7 @@ export class Telegram implements INodeType {
 						type: 'string',
 						displayOptions: {
 							show: {
-								'/operation': ['sendAudio'],
+								'/operation': ['sendAudio', 'sendVoice'],
 							},
 						},
 						default: '',
@@ -1711,7 +1745,7 @@ export class Telegram implements INodeType {
 						type: 'string',
 						displayOptions: {
 							show: {
-								'/operation': ['sendAnimation', 'sendAudio', 'sendDocument', 'sendVideo'],
+								'/operation': ['sendAnimation', 'sendAudio', 'sendVoice', 'sendDocument', 'sendVideo'],
 							},
 						},
 						default: '',
@@ -1930,6 +1964,18 @@ export class Telegram implements INodeType {
 						// ----------------------------------
 
 						endpoint = 'sendAudio';
+
+						body.chat_id = this.getNodeParameter('chatId', i) as string;
+						body.audio = this.getNodeParameter('file', i, '') as string;
+
+						// Add additional fields and replyMarkup
+						addAdditionalFields.call(this, body, i);
+					} else if (operation === 'sendVoice') {
+						// ----------------------------------
+						//         message:sendVoice
+						// ----------------------------------
+
+						endpoint = 'sendVoice';
 
 						body.chat_id = this.getNodeParameter('chatId', i) as string;
 						body.audio = this.getNodeParameter('file', i, '') as string;
