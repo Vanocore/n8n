@@ -7,14 +7,13 @@ import type {
 	ConnectStartEvent,
 } from '@/types';
 import type {
-	EdgeMouseEvent,
 	Connection,
 	XYPosition,
 	ViewportTransform,
 	NodeChange,
 	NodePositionChange,
 } from '@vue-flow/core';
-import { useVueFlow, VueFlow, PanelPosition } from '@vue-flow/core';
+import { useVueFlow, VueFlow, PanelPosition, MarkerType } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { MiniMap } from '@vue-flow/minimap';
 import Node from './elements/nodes/CanvasNode.vue';
@@ -31,6 +30,7 @@ import { isPresent } from '@/utils/typesUtils';
 import { GRID_SIZE } from '@/utils/nodeViewUtils';
 import { CanvasKey } from '@/constants';
 import { onKeyDown, onKeyUp } from '@vueuse/core';
+import CanvasArrowHeadMarker from './elements/edges/CanvasArrowHeadMarker.vue';
 
 const $style = useCssModule();
 
@@ -122,7 +122,10 @@ const classes = computed(() => ({
 
 const disableKeyBindings = computed(() => !props.keyBindings);
 
-const panningKeyCode = 'Shift';
+/**
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values#whitespace_keys
+ */
+const panningKeyCode = ' ';
 const isPanningEnabled = ref(false);
 
 onKeyDown(panningKeyCode, () => {
@@ -261,19 +264,7 @@ function onClickConnectionAdd(connection: Connection) {
 	emit('click:connection:add', connection);
 }
 
-/**
- * Connection hover
- */
-
-const hoveredEdges = ref<Record<string, boolean>>({});
-
-function onMouseEnterEdge(event: EdgeMouseEvent) {
-	hoveredEdges.value[event.edge.id] = true;
-}
-
-function onMouseLeaveEdge(event: EdgeMouseEvent) {
-	hoveredEdges.value[event.edge.id] = false;
-}
+const arrowHeadMarkerId = ref('custom-arrow-head');
 
 /**
  * Executions
@@ -309,6 +300,7 @@ function emitWithLastSelectedNode(emitFn: (id: string) => void) {
 
 const defaultZoom = 1;
 const zoom = ref(defaultZoom);
+const isPaneMoving = ref(false);
 
 function getProjectedPosition(event?: MouseEvent) {
 	const bounds = viewportRef.value?.getBoundingClientRect() ?? { left: 0, top: 0 };
@@ -352,6 +344,14 @@ function onViewportChange(viewport: ViewportTransform) {
 function setReadonly(value: boolean) {
 	setInteractive(!value);
 	elementsSelectable.value = true;
+}
+
+function onPaneMoveStart() {
+	isPaneMoving.value = true;
+}
+
+function onPaneMoveEnd() {
+	isPaneMoving.value = false;
 }
 
 /**
@@ -414,8 +414,43 @@ function onContextMenuAction(action: ContextMenuAction, nodeIds: string[]) {
  * Minimap
  */
 
+const minimapVisibilityDelay = 1000;
+const minimapHideTimeout = ref<NodeJS.Timeout | null>(null);
+const isMinimapVisible = ref(false);
+
 function minimapNodeClassnameFn(node: CanvasNode) {
 	return `minimap-node-${node.data?.render.type.replace(/\./g, '-') ?? 'default'}`;
+}
+
+watch(isPaneMoving, (value) => {
+	if (value) {
+		showMinimap();
+	} else {
+		hideMinimap();
+	}
+});
+
+function showMinimap() {
+	if (minimapHideTimeout.value) {
+		clearTimeout(minimapHideTimeout.value);
+		minimapHideTimeout.value = null;
+	}
+
+	isMinimapVisible.value = true;
+}
+
+function hideMinimap() {
+	minimapHideTimeout.value = setTimeout(() => {
+		isMinimapVisible.value = false;
+	}, minimapVisibilityDelay);
+}
+
+function onMinimapMouseEnter() {
+	showMinimap();
+}
+
+function onMinimapMouseLeave() {
+	hideMinimap();
 }
 
 /**
@@ -456,6 +491,8 @@ provide(CanvasKey, {
 		:nodes="nodes"
 		:edges="connections"
 		:apply-changes="false"
+		:connection-line-options="{ markerEnd: MarkerType.ArrowClosed }"
+		:connection-radius="60"
 		pan-on-scroll
 		snap-to-grid
 		:snap-grid="[GRID_SIZE, GRID_SIZE]"
@@ -465,8 +502,6 @@ provide(CanvasKey, {
 		:selection-key-code="selectionKeyCode"
 		:pan-activation-key-code="panningKeyCode"
 		data-test-id="canvas"
-		@edge-mouse-enter="onMouseEnterEdge"
-		@edge-mouse-leave="onMouseLeaveEdge"
 		@connect-start="onConnectStart"
 		@connect="onConnect"
 		@connect-end="onConnectEnd"
@@ -474,6 +509,8 @@ provide(CanvasKey, {
 		@contextmenu="onOpenContextMenu"
 		@viewport-change="onViewportChange"
 		@nodes-change="onNodesChange"
+		@move-start="onPaneMoveStart"
+		@move-end="onPaneMoveEnd"
 	>
 		<template #node-canvas-node="canvasNodeProps">
 			<Node
@@ -495,8 +532,8 @@ provide(CanvasKey, {
 		<template #edge-canvas-edge="canvasEdgeProps">
 			<Edge
 				v-bind="canvasEdgeProps"
+				:marker-end="`url(#${arrowHeadMarkerId})`"
 				:read-only="readOnly"
-				:hovered="hoveredEdges[canvasEdgeProps.id]"
 				@add="onClickConnectionAdd"
 				@delete="onDeleteConnection"
 			/>
@@ -506,20 +543,26 @@ provide(CanvasKey, {
 			<CanvasConnectionLine v-bind="connectionLineProps" />
 		</template>
 
+		<CanvasArrowHeadMarker :id="arrowHeadMarkerId" />
+
 		<Background data-test-id="canvas-background" pattern-color="#aaa" :gap="GRID_SIZE" />
 
-		<MiniMap
-			data-test-id="canvas-minimap"
-			aria-label="n8n Minimap"
-			:height="120"
-			:width="200"
-			:position="PanelPosition.BottomLeft"
-			pannable
-			zoomable
-			:node-class-name="minimapNodeClassnameFn"
-			mask-color="var(--color-background-base)"
-			:node-border-radius="16"
-		/>
+		<Transition name="minimap">
+			<MiniMap
+				v-show="isMinimapVisible"
+				data-test-id="canvas-minimap"
+				aria-label="n8n Minimap"
+				:height="120"
+				:width="200"
+				:position="PanelPosition.BottomLeft"
+				pannable
+				zoomable
+				:node-class-name="minimapNodeClassnameFn"
+				:node-border-radius="16"
+				@mouseenter="onMinimapMouseEnter"
+				@mouseleave="onMinimapMouseLeave"
+			/>
+		</Transition>
 
 		<CanvasControlButtons
 			data-test-id="canvas-controls"
@@ -554,5 +597,17 @@ provide(CanvasKey, {
 	:global(.vue-flow__pane.dragging) {
 		cursor: grabbing;
 	}
+}
+</style>
+
+<style lang="scss" scoped>
+.minimap-enter-active,
+.minimap-leave-active {
+	transition: opacity 0.3s ease;
+}
+
+.minimap-enter-from,
+.minimap-leave-to {
+	opacity: 0;
 }
 </style>

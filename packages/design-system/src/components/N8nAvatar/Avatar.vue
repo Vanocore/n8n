@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import Avatar from 'vue-boring-avatars';
+
 import { getInitials } from '../../utils/labelUtil';
 
 interface AvatarProps {
@@ -63,6 +64,10 @@ const getSize = (size: string): number => sizes[size];
 	display: inline-flex;
 	justify-content: center;
 	align-items: center;
+
+	svg {
+		border-radius: 50%;
+	}
 }
 
 .empty {

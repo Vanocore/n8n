@@ -1,16 +1,14 @@
-import { Container, Service } from 'typedi';
-import { exec as callbackExec } from 'child_process';
-import { resolve } from 'path';
-import { access as fsAccess } from 'fs/promises';
-import { promisify } from 'util';
+import type { FrontendSettings } from '@n8n/api-types';
 import cookieParser from 'cookie-parser';
 import express from 'express';
+import { access as fsAccess } from 'fs/promises';
 import helmet from 'helmet';
 import { InstanceSettings } from 'n8n-core';
-import type { IN8nUISettings } from 'n8n-workflow';
+import { resolve } from 'path';
+import { Container, Service } from 'typedi';
 
+import { AbstractServer } from '@/abstract-server';
 import config from '@/config';
-
 import {
 	CLI_DIR,
 	EDITOR_UI_DIST_DIR,
@@ -20,22 +18,21 @@ import {
 	N8N_VERSION,
 	Time,
 } from '@/constants';
-import type { APIRequest } from '@/requests';
-import { ControllerRegistry } from '@/decorators';
-import { isApiEnabled, loadPublicApiVersions } from '@/public-api';
-import type { ICredentialsOverwrite } from '@/interfaces';
 import { CredentialsOverwrites } from '@/credentials-overwrites';
-import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
-import * as ResponseHelper from '@/response-helper';
-import { setupPushServer, setupPushHandler, Push } from '@/push';
-import { isLdapEnabled } from '@/ldap/helpers.ee';
-import { AbstractServer } from '@/abstract-server';
-import { PostHogClient } from '@/posthog';
+import { ControllerRegistry } from '@/decorators';
 import { MessageEventBus } from '@/eventbus/message-event-bus/message-event-bus';
+import { LogStreamingEventRelay } from '@/events/log-streaming-event-relay';
+import type { ICredentialsOverwrite } from '@/interfaces';
+import { isLdapEnabled } from '@/ldap/helpers.ee';
+import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
 import { handleMfaDisable, isMfaFeatureEnabled } from '@/mfa/helpers';
+import { PostHogClient } from '@/posthog';
+import { isApiEnabled, loadPublicApiVersions } from '@/public-api';
+import { setupPushServer, setupPushHandler, Push } from '@/push';
+import type { APIRequest } from '@/requests';
+import * as ResponseHelper from '@/response-helper';
 import type { FrontendService } from '@/services/frontend.service';
 import { OrchestrationService } from '@/services/orchestration.service';
-import { LogStreamingEventRelay } from '@/events/log-streaming-event-relay';
 
 import '@/controllers/active-workflows.controller';
 import '@/controllers/annotation-tags.controller';
@@ -67,8 +64,6 @@ import '@/license/license.controller';
 import '@/workflows/workflow-history/workflow-history.controller.ee';
 import '@/workflows/workflows.controller';
 import { EventService } from './events/event.service';
-
-const exec = promisify(callbackExec);
 
 @Service()
 export class Server extends AbstractServer {
@@ -175,9 +170,6 @@ export class Server extends AbstractServer {
 		const { frontendService } = this;
 		if (frontendService) {
 			frontendService.addToSettings({
-				isNpmAvailable: await exec('npm --version')
-					.then(() => true)
-					.catch(() => false),
 				versionCli: N8N_VERSION,
 			});
 
@@ -253,7 +245,7 @@ export class Server extends AbstractServer {
 			this.app.get(
 				`/${this.restEndpoint}/settings`,
 				ResponseHelper.send(
-					async (req: express.Request): Promise<IN8nUISettings> =>
+					async (req: express.Request): Promise<FrontendSettings> =>
 						frontendService.getSettings(req.headers['push-ref'] as string),
 				),
 			);

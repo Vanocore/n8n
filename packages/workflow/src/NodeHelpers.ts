@@ -10,6 +10,8 @@ import get from 'lodash/get';
 import isEqual from 'lodash/isEqual';
 import uniqBy from 'lodash/uniqBy';
 
+import { SINGLE_EXECUTION_NODES } from './Constants';
+import { ApplicationError } from './errors/application.error';
 import { NodeConnectionType } from './Interfaces';
 import type {
 	FieldType,
@@ -44,18 +46,15 @@ import type {
 	NodeHint,
 	INodeExecutionData,
 } from './Interfaces';
+import { validateFilterParameter } from './NodeParameters/FilterParameter';
 import {
 	isFilterValue,
 	isResourceMapperValue,
 	isValidResourceLocatorParameterValue,
 } from './type-guards';
-import { deepCopy } from './utils';
-
-import type { Workflow } from './Workflow';
-import { validateFilterParameter } from './NodeParameters/FilterParameter';
 import { validateFieldType } from './TypeValidation';
-import { ApplicationError } from './errors/application.error';
-import { SINGLE_EXECUTION_NODES } from './Constants';
+import { deepCopy } from './utils';
+import type { Workflow } from './Workflow';
 
 export const cronNodeOptions: INodePropertyCollection[] = [
 	{
@@ -351,13 +350,6 @@ const declarativeNodeOptionParameters: INodeProperties = {
 		},
 	],
 };
-
-/**
- * Determines if the node is of INodeType
- */
-export function isINodeType(obj: unknown): obj is INodeType {
-	return typeof obj === 'object' && obj !== null && 'execute' in obj;
-}
 
 /**
  * Modifies the description of the passed in object, such that it can be used
