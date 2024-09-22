@@ -35,12 +35,6 @@ const modelParameter: INodeProperties = {
 							},
 						},
 						{
-							type: 'filter',
-							properties: {
-								pass: "={{ $responseItem.id.includes('embed') }}",
-							},
-						},
-						{
 							type: 'setKeyValue',
 							properties: {
 								name: '={{$responseItem.id}}',
